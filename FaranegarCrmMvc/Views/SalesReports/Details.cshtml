@@ -1,0 +1,23 @@
+﻿@using FaranegarCrmMvc.Services
+@model FaranegarCrmMvc.Models.SalesReport
+
+@{
+    ViewData["Title"] = "جزئیات گزارش";
+}
+<h2>جزئیات</h2>
+<dl class="row">
+    <dt class="col-sm-2">Subject</dt>
+    <dd class="col-sm-10">@Model.Subject</dd>
+    <dt class="col-sm-2">طرف حساب</dt>
+    <dd class="col-sm-10">@Model.Account?.Name</dd>
+    <dt class="col-sm-2">PNR</dt>
+    <dd class="col-sm-10">@Model.PNR</dd>
+    <dt class="col-sm-2">Ticket</dt>
+    <dd class="col-sm-10">@Model.TicketNumber</dd>
+    <dt class="col-sm-2">ایرلاین</dt>
+    <dd class="col-sm-10">@Model.Airline</dd>
+    <dt class="col-sm-2">FARE/TAX/TOTAL</dt>
+    <dd class="col-sm-10">@Model.FareAmount / @Model.TaxAmount / @Model.TotalAmount</dd>
+    <dt class="col-sm-2">Raw</dt>
+    <dd class="col-sm-10"><pre>@Model.AdditionalJson</pre></dd>
+</dl>

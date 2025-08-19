@@ -1,0 +1,21 @@
+﻿@{
+    ViewData["Title"] = "ایمپورت فرانگر";
+}
+<h2>@ViewData["Title"]</h2>
+
+@if (TempData["Err"] != null)
+{
+     <div class="alert alert-danger">@TempData["Err"]</div>
+}
+@if (TempData["Ok"] != null)
+{
+     <div class="alert alert-success">@TempData["Ok"]</div>
+}
+
+<form asp-action="Index" method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label class="form-label">فایل فرانگر (Excel 2003 XML .xls یا CSV)</label>
+        <input class="form-control" type="file" name="file" />
+    </div>
+    <button class="btn btn-primary">ایمپورت</button>
+</form>

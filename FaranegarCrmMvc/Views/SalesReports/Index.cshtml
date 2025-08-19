@@ -1,0 +1,215 @@
+﻿@using FaranegarCrmMvc.Services
+@model FaranegarCrmMvc.ViewModels.SalesReportsIndexVM
+@{
+    ViewData["Title"] = "گزارش فروش";
+    var q = Context.Request.Query["q"].ToString();
+
+    var start = (Model.Page - 1) * Model.PageSize;
+    var i = 0;
+
+    int totalPages = (int)Math.Ceiling((double)Model.Total / Math.Max(1, Model.PageSize));
+    int page = Model.Page;
+    int pageSize = Model.PageSize;
+
+    var moreHeader = "گزارش فروش";
+    int moreIndex = Model.Headers.FindIndex(h => h == moreHeader);
+
+    var ticketHeader = "شماره بلیط";
+    int ticketIndex = Model.Headers.FindIndex(h => h == ticketHeader);
+}
+
+<h2 class="px-3">@ViewData["Title"]</h2>
+
+<form method="get" class="row g-2 mb-3 px-3">
+    <div class="col-auto">
+        <input type="text" name="q" value="@q" class="form-control" placeholder="جستجو (PNR/Subject/شماره بلیت/ایرلاین/فاکتور)">
+    </div>
+    <div class="col-auto">
+        <select name="pageSize" class="form-select" onchange="this.form.submit()">
+            <option value="50" selected="@(pageSize==50  ? "selected" : null)">50</option>
+            <option value="100" selected="@(pageSize==100 ? "selected" : null)">100</option>
+            <option value="200" selected="@(pageSize==200 ? "selected" : null)">200</option>
+            <option value="500" selected="@(pageSize==500 ? "selected" : null)">500</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-secondary">اعمال</button>
+    </div>
+</form>
+
+<div class="mb-2 px-3">
+    <small>کل رکوردها: <strong>@Model.Total</strong> | صفحه: <strong>@Model.Page</strong> از <strong>@totalPages</strong> | در هر صفحه: <strong>@Model.PageSize</strong></small>
+</div>
+
+<div class="table-responsive w-100">
+    <table class="table table-bordered table-sm align-middle w-100">
+        <thead>
+            <tr>
+                <th>ردیف</th>
+                <th>Subject</th>
+                <th>طرف حساب</th>
+                <th>تاریخ</th>
+                <th>ایرلاین</th>
+                <th>PNR</th>
+                <th>TOTAL</th>
+                @foreach (var h in Model.Headers)
+                {
+                    <th>@h</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model.Data)
+            {
+                // کلید یکتا برای هر ردیف (حتی اگر Id تکراری باشد)
+                var key = $"more_{r.Id}_{Guid.NewGuid():N}";
+
+                <tr>
+                    <td>@(start + (++i))</td>
+                    <td>@r.Subject</td>
+                    <td class="nowrap">@r.Account?.Name</td>
+                    <td>@(r.IssueDate?.ToString("yyyy/MM/dd"))</td>
+                    <td>@r.Airline</td>
+                    <td class="nowrap ltr">@r.PNR</td>
+                    <td>@r.TotalAmount</td>
+
+                    @for (int c = 1; c <= Model.Headers.Count; c++)
+                    {
+                        var prop = typeof(FaranegarCrmMvc.Models.SalesReport).GetProperty($"Ex{c.ToString("00")}");
+                        var val = prop?.GetValue(r) as string ?? "";
+
+                        if (moreIndex >= 0 && c == (moreIndex + 1))
+                        {
+                            <td>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary more-btn"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#moreModal"
+                                        data-more-id="@key"
+                                        data-content="@val"
+                                        data-title="گزارش فروش">
+                                    مشاهده بیشتر
+                                </button>
+
+                                <!-- نسخهٔ پشتیبان محتوا برای مودال -->
+                                <div id="@key" class="d-none more-content">@val</div>
+                            </td>
+                        }
+                        else if (ticketIndex >= 0 && c == (ticketIndex + 1))
+                        {
+                            <td class="nowrap ltr">@val</td>
+                        }
+                        else
+                        {
+                            <td>@val</td>
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<nav aria-label="pager" class="px-3">
+    <ul class="pagination">
+        <li class="page-item @(page<=1 ? "disabled" : "")">
+            <a class="page-link" href="?q=@q&page=1&pageSize=@pageSize">اول</a>
+        </li>
+        <li class="page-item @(page<=1 ? "disabled" : "")">
+            <a class="page-link" href="?q=@q&page=@(page-1)&pageSize=@pageSize">قبلی</a>
+        </li>
+        <li class="page-item @(page>=totalPages ? "disabled" : "")">
+            <a class="page-link" href="?q=@q&page=@(page+1)&pageSize=@pageSize">بعدی</a>
+        </li>
+        <li class="page-item @(page>=totalPages ? "disabled" : "")">
+            <a class="page-link" href="?q=@q&page=@totalPages&pageSize=@pageSize">آخر</a>
+        </li>
+    </ul>
+</nav>
+
+<!-- Modal -->
+<div class="modal fade" id="moreModal" tabindex="-1" aria-labelledby="moreModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moreModalLabel">گزارش فروش</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body">
+                <div id="moreModalBody" class="more-box"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* تمام‌عرض کردن کانتینر فقط در این صفحه */
+    .container, .container-sm, .container-md, .container-lg, .container-xl, .container-xxl {
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .table-responsive, .table {
+        width: 100% !important;
+    }
+
+        /* وسط‌چین همهٔ سلول‌ها */
+        .table th, .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+    /* متن بلند در مودال */
+    .more-box {
+        white-space: pre-wrap;
+        direction: rtl;
+        text-align: right;
+        max-height: 70vh;
+        overflow: auto;
+    }
+
+    /* جلوگیری از شکستن خط */
+    .nowrap {
+        white-space: nowrap;
+    }
+
+    /* نمایش اعداد/شماره بلیت از چپ به راست */
+    .ltr {
+        direction: ltr;
+        unicode-bidi: plaintext;
+    }
+</style>
+
+<script>
+    // روی هر کلیک دکمه "مشاهده بیشتر"، محتوا را تنظیم می‌کنیم
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.more-btn[data-bs-target="#moreModal"]');
+        if (!btn) return;
+
+        var bodyEl = document.getElementById('moreModalBody');
+        var titleEl = document.getElementById('moreModalLabel');
+        if (!bodyEl) return;
+
+        // اولویت 1: محتوای تعبیه‌شده در خود دکمه (data-content)
+        var content = btn.getAttribute('data-content') || '';
+
+        // اگر خالی بود، اولویت 2: از div مخفی همان ردیف بخوان
+        if (!content) {
+            var holderId = btn.getAttribute('data-more-id');
+            var src = holderId ? document.getElementById(holderId) : null;
+            if (src) content = src.textContent || src.innerText || '';
+        }
+
+        // ست‌کردن متن (ایمن؛ بدون HTML اجرایى)
+        bodyEl.textContent = content;
+
+        // عنوان مودال (اختیاری)
+        if (titleEl) {
+            titleEl.textContent = btn.getAttribute('data-title') || 'گزارش فروش';
+        }
+    });
+</script>

@@ -1,0 +1,12 @@
+﻿@model FaranegarCrmMvc.Models.Account
+@{
+    ViewData["Title"] = "افزودن طرف حساب";
+}
+<h2>@ViewData["Title"]</h2>
+<form asp-action="Create" method="post">
+    <div class="mb-3"><label class="form-label">نام</label><input asp-for="Name" class="form-control" /></div>
+    <div class="mb-3"><label class="form-label">کد</label><input asp-for="Code" class="form-control" /></div>
+    <div class="mb-3"><label class="form-label">تلفن</label><input asp-for="Phone" class="form-control" /></div>
+    <div class="mb-3"><label class="form-label">ایمیل</label><input asp-for="Email" class="form-control" /></div>
+    <button class="btn btn-primary">ثبت</button>
+</form>
