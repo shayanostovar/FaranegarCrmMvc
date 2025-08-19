@@ -58,12 +58,11 @@
                 }
             </tr>
         </thead>
-        <tbody>
+        <tbody id="sales-table-body">
             @foreach (var r in Model.Data)
             {
-                // کلید یکتا برای هر ردیف (حتی اگر Id تکراری باشد)
+                // یک کلید یکتا برای محتوای مخفی این ردیف
                 var key = $"more_{r.Id}_{Guid.NewGuid():N}";
-
                 <tr>
                     <td>@(start + (++i))</td>
                     <td>@r.Subject</td>
@@ -83,15 +82,12 @@
                             <td>
                                 <button type="button"
                                         class="btn btn-sm btn-outline-primary more-btn"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#moreModal"
                                         data-more-id="@key"
-                                        data-content="@val"
                                         data-title="گزارش فروش">
                                     مشاهده بیشتر
                                 </button>
 
-                                <!-- نسخهٔ پشتیبان محتوا برای مودال -->
+                                <!-- محتوای پشتیبان برای مودال (مخفی) -->
                                 <div id="@key" class="d-none more-content">@val</div>
                             </td>
                         }
@@ -127,7 +123,7 @@
     </ul>
 </nav>
 
-<!-- Modal -->
+<!-- Modal (Bootstrap 5) -->
 <div class="modal fade" id="moreModal" tabindex="-1" aria-labelledby="moreModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
@@ -184,32 +180,55 @@
     }
 </style>
 
-<script>
-    // روی هر کلیک دکمه "مشاهده بیشتر"، محتوا را تنظیم می‌کنیم
-    document.addEventListener('click', function (e) {
-        var btn = e.target.closest('.more-btn[data-bs-target="#moreModal"]');
-        if (!btn) return;
+@section Scripts {
+    <script>
+        (function () {
+            // مطمئن شو bootstrap.bundle.js لود شده
+            function hasBootstrap() { return window.bootstrap && typeof bootstrap.Modal === 'function'; }
 
-        var bodyEl = document.getElementById('moreModalBody');
-        var titleEl = document.getElementById('moreModalLabel');
-        if (!bodyEl) return;
+            // با delegation روی کل tbody کار می‌کنیم تا دکمه‌های آینده هم کار کنند
+            document.getElementById('sales-table-body')?.addEventListener('click', function (e) {
+                var btn = e.target.closest('.more-btn');
+                if (!btn) return;
 
-        // اولویت 1: محتوای تعبیه‌شده در خود دکمه (data-content)
-        var content = btn.getAttribute('data-content') || '';
+                var holderId = btn.getAttribute('data-more-id');
+                var src = holderId ? document.getElementById(holderId) : null;
 
-        // اگر خالی بود، اولویت 2: از div مخفی همان ردیف بخوان
-        if (!content) {
-            var holderId = btn.getAttribute('data-more-id');
-            var src = holderId ? document.getElementById(holderId) : null;
-            if (src) content = src.textContent || src.innerText || '';
-        }
+                var bodyEl = document.getElementById('moreModalBody');
+                var titleEl = document.getElementById('moreModalLabel');
 
-        // ست‌کردن متن (ایمن؛ بدون HTML اجرایى)
-        bodyEl.textContent = content;
+                // مقدار محتوا را از div مخفی بخوان
+                var content = src ? (src.textContent || src.innerText || '') : '';
+                if (!content) content = 'محتوایی برای نمایش وجود ندارد.';
 
-        // عنوان مودال (اختیاری)
-        if (titleEl) {
-            titleEl.textContent = btn.getAttribute('data-title') || 'گزارش فروش';
-        }
-    });
-</script>
+                if (bodyEl) bodyEl.textContent = content;  // امن: بدون HTML
+                if (titleEl) titleEl.textContent = btn.getAttribute('data-title') || 'گزارش فروش';
+
+                // نمایش مودال
+                var modalEl = document.getElementById('moreModal');
+                if (!modalEl) { alert('Modal element not found'); return; }
+
+                if (hasBootstrap()) {
+                    // استفاده از API رسمی بوت‌استرپ (پایدار)
+                    var m = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, keyboard: true });
+                    m.show();
+                } else {
+                    // اگر بوت‌استرپ لود نشده بود، fallback خیلی ساده
+                    modalEl.classList.add('show');
+                    modalEl.style.display = 'block';
+                    modalEl.removeAttribute('aria-hidden');
+                    modalEl.setAttribute('aria-modal', 'true');
+                    // بستن با کلیک روی پس‌زمینه یا دکمه بستن
+                    modalEl.addEventListener('click', function (ev) {
+                        if (ev.target.classList.contains('modal') || ev.target.classList.contains('btn-close')) {
+                            modalEl.classList.remove('show');
+                            modalEl.style.display = 'none';
+                            modalEl.setAttribute('aria-hidden', 'true');
+                            modalEl.removeAttribute('aria-modal');
+                        }
+                    }, { once: true });
+                }
+            });
+        })();
+    </script>
+}
