@@ -5,47 +5,54 @@ namespace FaranegarCrmMvc.Models
     public class CallLog
     {
         public int Id { get; set; }
-        public string UniqueId { get; set; } = "";    // یکتای تماس در استریسک
 
+        // شناسه‌های تماس
+        public string UniqueId { get; set; } = "";    // یکتای کانال در استریسک (الزامی و یکتا)
+        public string? LinkedId { get; set; }         // یک شناسه مشترک برای تمام لگ‌های یک تماس
+
+        // اطلاعات عمومی
         public string? Direction { get; set; }        // Inbound / Outbound / Unknown
-
         public string? CallerIdNum { get; set; }
         public string? CallerIdName { get; set; }
-
-        public string? Src { get; set; }              // مبدا
-        public string? Dst { get; set; }              // مقصد
+        public string? Src { get; set; }              // مبدا (from)
+        public string? Dst { get; set; }              // مقصد (to)
         public string? SrcChannel { get; set; }       // مثل SIP/1001-...
         public string? DstChannel { get; set; }
 
-        public DateTime StartAt { get; set; }         // شروع تماس (Local)
-        public DateTime? AnsweredAt { get; set; }     // زمان پاسخ‌گویی
-        public DateTime? EndAt { get; set; }          // پایان
+        // زمان‌ها (Local)
+        public DateTime StartAt { get; set; }
+        public DateTime? AnsweredAt { get; set; }
+        public DateTime? EndAt { get; set; }
 
-        public string? Disposition { get; set; }      // Answered/No Answer/Busy/Failed/Abandoned
+        // وضعیت و کد قطع
+        public string? Disposition { get; set; }      // ANSWERED / NO ANSWER / BUSY / FAILED / ABANDONED
         public int? HangupCause { get; set; }
         public string? HangupCauseText { get; set; }
 
-        public int? DurationSec { get; set; }         // کل مدت
-        public int? BillSec { get; set; }             // مدت مکالمه پس از پاسخ
+        // مدت‌ها (ثانیه)
+        public int? DurationSec { get; set; }
+        public int? BillSec { get; set; }
 
-        public string? RecordingFile { get; set; }    // فقط نام/مسیر؛ فایل ذخیره نمی‌کنیم
+        // ضبط (نام/مسیر؛ خود فایل ذخیره نمی‌شود)
+        public string? RecordingFile { get; set; }
 
         // --- اطلاعات صف (Queue) ---
-        public string? QueueName { get; set; }        // مثال: support-queue
+        public string? QueueName { get; set; }        // نام صف
         public DateTime? QueueJoinAt { get; set; }    // زمان ورود به صف
-        public DateTime? QueueLeaveAt { get; set; }   // زمان خروج از صف (یا پایان)
-        public int? QueueHoldSec { get; set; }        // مدت انتظار تا پاسخ (HoldTime)
+        public DateTime? QueueLeaveAt { get; set; }   // زمان خروج از صف
+        public int? QueueHoldSec { get; set; }        // مدت انتظار تا پاسخ
 
         // Agent/Extension پاسخ‌گو
         public string? AgentExt { get; set; }         // مثال: 1010
         public string? AgentChannel { get; set; }     // مثال: SIP/1010-00001234
-        public DateTime? AgentConnectAt { get; set; } // زمان اتصال Agent (AgentConnect)
+        public DateTime? AgentConnectAt { get; set; } // زمان اتصال Agent
 
-        // مقادیر تکمیلی از Queue رویدادها (اختیاری)
-        public int? RingSec { get; set; }             // مدت Ring قبل از پاسخ
-        public int? TalkSec { get; set; }             // مدت مکالمه گزارش شده در AgentComplete
+        // مقادیر تکمیلی از رویدادهای صف
+        public int? RingSec { get; set; }
+        public int? TalkSec { get; set; }
 
-        public string? RawJson { get; set; }          // آخرین ایونت خام برای دیباگ
+        // دیباگ
+        public string? RawJson { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now; // Local
     }
 }

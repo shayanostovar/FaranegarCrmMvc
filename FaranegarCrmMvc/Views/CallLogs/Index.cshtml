@@ -75,7 +75,7 @@
                     <td class="nowrap">@r.StartAt.ToString("yyyy/MM/dd HH:mm:ss")</td>
                     <td class="nowrap">@r.AnsweredAt?.ToString("HH:mm:ss")</td>
                     <td class="nowrap">@r.EndAt?.ToString("HH:mm:ss")</td>
-                    <td>@r.Disposition</td>
+                    <td>@r.Disposition?.ToUpperInvariant()</td>
                     <td class="nowrap ltr">@r.CallerIdNum</td>
                     <td class="nowrap ltr">@r.Src</td>
                     <td class="nowrap ltr">@r.Dst</td>
@@ -101,17 +101,7 @@
 </nav>
 
 <style>
-    .table th, .table td {
-        text-align: center;
-        vertical-align: middle;
-    }
-
-    .nowrap {
-        white-space: nowrap;
-    }
-
-    .ltr {
-        direction: ltr;
-        unicode-bidi: plaintext;
-    }
+    .table th, .table td { text-align: center; vertical-align: middle; }
+    .nowrap { white-space: nowrap; }
+    .ltr { direction: ltr; unicode-bidi: plaintext; }
 </style>

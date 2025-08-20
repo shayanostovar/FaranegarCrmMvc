@@ -10,10 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<SalesReport> SalesReports => Set<SalesReport>();
 
-    // تماس‌ها
     public DbSet<CallLog> CallLogs => Set<CallLog>();
-
-    // ریزرویدادهای صف
     public DbSet<QueueLog> QueueLogs => Set<QueueLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -42,9 +39,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CallLog>(e =>
         {
             e.HasIndex(x => x.UniqueId).IsUnique();
+            e.HasIndex(x => x.LinkedId);
             e.HasIndex(x => x.StartAt);
 
             e.Property(x => x.UniqueId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.LinkedId).HasMaxLength(64);
             e.Property(x => x.Direction).HasMaxLength(16);
             e.Property(x => x.CallerIdNum).HasMaxLength(64);
             e.Property(x => x.CallerIdName).HasMaxLength(128);
@@ -56,7 +55,6 @@ public class AppDbContext : DbContext
             e.Property(x => x.HangupCauseText).HasMaxLength(128);
             e.Property(x => x.RecordingFile).HasMaxLength(260);
 
-            // صف + داخلی پاسخ‌گو
             e.Property(x => x.QueueName).HasMaxLength(128);
             e.Property(x => x.AgentExt).HasMaxLength(32);
             e.Property(x => x.AgentChannel).HasMaxLength(128);
@@ -67,7 +65,10 @@ public class AppDbContext : DbContext
         {
             e.HasIndex(x => x.OccurredAt);
             e.HasIndex(x => x.UniqueId);
+            e.HasIndex(x => x.LinkedId);
+
             e.Property(x => x.UniqueId).HasMaxLength(64);
+            e.Property(x => x.LinkedId).HasMaxLength(64);
             e.Property(x => x.Event).HasMaxLength(64).IsRequired();
             e.Property(x => x.Queue).HasMaxLength(128);
             e.Property(x => x.CallerIdNum).HasMaxLength(64);

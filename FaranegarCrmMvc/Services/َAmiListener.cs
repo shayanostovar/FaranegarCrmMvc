@@ -9,11 +9,6 @@ using FaranegarCrmMvc.Models;
 
 namespace FaranegarCrmMvc.Services
 {
-    /// <summary>
-    /// فقط تماس‌های ورودی که حداقل یک سمتشان روی ترانک‌های to_74931/to_tel30 است
-    /// و سمت دیگر داخلی/صف (SIP/Queue) باشد را لاگ می‌کند. همه زمان‌ها Local ذخیره می‌شوند.
-    /// رویدادهای صف (Queue) نیز به صورت کامل در QueueLogs ذخیره شده و خلاصهٔ مهم در CallLogs می‌نشیند.
-    /// </summary>
     public class AmiListener : BackgroundService
     {
         private readonly IOptions<AmiOptions> _opt;
@@ -22,8 +17,8 @@ namespace FaranegarCrmMvc.Services
 
         private static readonly string[] _trunkMarkers = new[] { "to_74931", "to_tel30" };
 
-        // UniqueIdهایی که inbound معتبر هستند
-        private readonly ConcurrentDictionary<string, bool> _trackInbound = new(StringComparer.OrdinalIgnoreCase);
+        // با کلید: LinkedId اگر موجود، وگرنه UniqueId
+        private readonly ConcurrentDictionary<string, bool> _inbound = new(StringComparer.OrdinalIgnoreCase);
 
         public AmiListener(IOptions<AmiOptions> opt,
                            IDbContextFactory<AppDbContext> dbFactory,
@@ -105,37 +100,33 @@ namespace FaranegarCrmMvc.Services
 
                 var uniqueId = d.TryGetValue("Uniqueid", out var u1) ? u1 :
                                d.TryGetValue("UniqueID", out var u2) ? u2 : null;
+                var linkedId = d.TryGetValue("Linkedid", out var l1) ? l1 :
+                               d.TryGetValue("LinkedID", out var l2) ? l2 : null;
 
-                // برخی رویدادهای صف ممکن است UniqueId نداشته باشند؛ در QueueLogs بدون UniqueId ذخیره می‌کنیم
-                var hasUid = !string.IsNullOrWhiteSpace(uniqueId);
+                var key = linkedId ?? uniqueId; // کلید رهگیری تماس منطقی
+                var hasKey = !string.IsNullOrWhiteSpace(key);
 
-                // --- اول: فیلتر تماس ورودی معتبر (برای Upsert در CallLogs) ---
-                if (hasUid && (!_trackInbound.TryGetValue(uniqueId!, out var inboundOk) || !inboundOk))
+                // اگر هنوز inbound نشده، بررسی کن
+                if (hasKey && (!_inbound.TryGetValue(key!, out var inboundOk) || !inboundOk))
                 {
                     if (IsInboundFromTrackedTrunks(d))
-                    {
-                        _trackInbound[uniqueId!] = true;
-                    }
+                        _inbound[key!] = true;
                 }
 
-                // --- پردازش رویدادهای صف: همیشه QueueLogs را می‌نویسیم (برای رصد کامل صف) ---
+                // رویدادهای صف: همیشه ذخیرهٔ جزئیات QueueLog
                 if (IsQueueEvent(evt))
                 {
-                    await WriteQueueLogAsync(evt, uniqueId, d, ct);
+                    await WriteQueueLogAsync(evt, uniqueId, linkedId, d, ct);
 
-                    // همزمان خلاصهٔ مهم را روی CallLog هم بنویسیم (اگر inbound معتبر و UniqueId داریم)
-                    if (hasUid && _trackInbound.TryGetValue(uniqueId!, out var inbound) && inbound)
-                    {
-                        await ApplyQueueSummaryToCallAsync(evt, uniqueId!, d, ct);
-                    }
-                    return; // queue events نیازی نیست ادامه پردازش شوند
+                    if (hasKey && _inbound.TryGetValue(key!, out var ok) && ok)
+                        await ApplyQueueSummaryToCallAsync(evt, uniqueId, linkedId, d, ct);
+
+                    return;
                 }
 
-                // --- بقیهٔ رویدادهای تماس (فقط اگر inbound معتبر است) ---
-                if (hasUid && _trackInbound.TryGetValue(uniqueId!, out var doTrack) && doTrack)
-                {
-                    await UpsertCallAsync(evt, uniqueId!, d, ct);
-                }
+                // سایر رویدادها: فقط اگر inbound معتبر است
+                if (hasKey && _inbound.TryGetValue(key!, out var doTrack) && doTrack)
+                    await UpsertCallAsync(evt, uniqueId, linkedId, d, ct);
             }
             catch (Exception ex)
             {
@@ -143,6 +134,7 @@ namespace FaranegarCrmMvc.Services
             }
         }
 
+        // ---------- Helpers ----------
         private static Dictionary<string, string> ParseToDict(string[] lines)
         {
             var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -183,7 +175,6 @@ namespace FaranegarCrmMvc.Services
             }.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
 
             bool hasTrackedTrunk = vals.Any(s => _trunkMarkers.Any(m => s!.Contains(m, StringComparison.OrdinalIgnoreCase)));
-
             bool looksInternalOrQueue = vals.Any(s =>
                 s!.Contains("SIP/", StringComparison.OrdinalIgnoreCase) ||
                 s.Contains("PJSIP/", StringComparison.OrdinalIgnoreCase) ||
@@ -192,11 +183,9 @@ namespace FaranegarCrmMvc.Services
                 s.Contains("queue", StringComparison.OrdinalIgnoreCase) ||
                 s.Contains("from-queue", StringComparison.OrdinalIgnoreCase)
             );
-
             return hasTrackedTrunk && looksInternalOrQueue;
         }
 
-        // --- Helpers ---
         private static int? ToInt(string? s) => int.TryParse(s, out var n) ? n : null;
 
         private static DateTime? ParseAmiDateLocal(string? s)
@@ -209,41 +198,83 @@ namespace FaranegarCrmMvc.Services
 
         private static string? ExtractExt(string? ifaceOrChan)
         {
-            // ورودی مثل: "SIP/1010", "SIP/1010-00001234", "PJSIP/2020", "Local/1010@from-queue"
             if (string.IsNullOrWhiteSpace(ifaceOrChan)) return null;
             var s = ifaceOrChan;
 
-            // Local/xxxx@...
             var localIdx = s.IndexOf("Local/", StringComparison.OrdinalIgnoreCase);
             if (localIdx >= 0)
             {
-                var rest = s.Substring(localIdx + 6);
+                var rest = s[(localIdx + 6)..];
                 var at = rest.IndexOf('@');
-                var part = at >= 0 ? rest.Substring(0, at) : rest;
+                var part = at >= 0 ? rest[..at] : rest;
                 return part.Trim();
             }
 
-            // SIP/xxx یا PJSIP/xxx
             var slash = s.IndexOf('/');
             if (slash >= 0 && slash + 1 < s.Length)
             {
-                var rest = s.Substring(slash + 1);
+                var rest = s[(slash + 1)..];
                 var dash = rest.IndexOf('-');
-                var ext = dash >= 0 ? rest.Substring(0, dash) : rest;
-                // فقط عدد/کاراکترهای معمول داخلی
+                var ext = dash >= 0 ? rest[..dash] : rest;
                 return ext.Trim();
             }
             return null;
         }
 
-        // --- QueueLogs writer ---
-        private async Task WriteQueueLogAsync(string evt, string? uniqueId, Dictionary<string, string> d, CancellationToken ct)
+        private static string? NormalizeDisposition(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            s = s.Trim().ToUpperInvariant();
+            return s switch
+            {
+                "NOANSWER" => "NO ANSWER",
+                _ => s
+            };
+        }
+
+        // گرفتن/ساختن رکورد تماس منطقی؛ اول با UniqueId سپس LinkedId
+        private static async Task<CallLog> GetOrCreateCallAsync(AppDbContext db, string? uniqueId, string? linkedId)
+        {
+            CallLog? call = null;
+
+            if (!string.IsNullOrWhiteSpace(uniqueId))
+                call = await db.CallLogs.FirstOrDefaultAsync(x => x.UniqueId == uniqueId);
+
+            if (call == null && !string.IsNullOrWhiteSpace(linkedId))
+                call = await db.CallLogs.FirstOrDefaultAsync(x => x.LinkedId == linkedId);
+
+            if (call == null)
+            {
+                // اگر UniqueId نداریم، یک مقدار مشتق از LinkedId می‌سازیم تا کلید یکتا رعایت شود
+                var uid = uniqueId ?? (linkedId != null ? $"L_{linkedId}" : Guid.NewGuid().ToString("N"));
+                call = new CallLog
+                {
+                    UniqueId = uid,
+                    LinkedId = linkedId,
+                    StartAt = DateTime.Now,
+                    Direction = "Inbound"
+                };
+                db.CallLogs.Add(call);
+            }
+            else
+            {
+                // اگر رکورد موجود LinkedId ندارد و داریم، ست کنیم
+                if (string.IsNullOrWhiteSpace(call.LinkedId) && !string.IsNullOrWhiteSpace(linkedId))
+                    call.LinkedId = linkedId;
+            }
+
+            return call;
+        }
+
+        // ------------- Queue Logs -------------
+        private async Task WriteQueueLogAsync(string evt, string? uniqueId, string? linkedId, Dictionary<string, string> d, CancellationToken ct)
         {
             await using var db = await _dbFactory.CreateDbContextAsync(ct);
 
             var ql = new QueueLog
             {
                 UniqueId = uniqueId,
+                LinkedId = linkedId,
                 Event = evt,
                 Queue = d.TryGetValue("Queue", out var q) ? q : null,
                 Position = d.TryGetValue("Position", out var pos) ? ToInt(pos) : null,
@@ -264,23 +295,14 @@ namespace FaranegarCrmMvc.Services
             await db.SaveChangesAsync(ct);
         }
 
-        // خلاصهٔ مهم صف را روی CallLog بنویس
-        private async Task ApplyQueueSummaryToCallAsync(string evt, string uniqueId, Dictionary<string, string> d, CancellationToken ct)
+        private async Task ApplyQueueSummaryToCallAsync(string evt, string? uniqueId, string? linkedId, Dictionary<string, string> d, CancellationToken ct)
         {
             await using var db = await _dbFactory.CreateDbContextAsync(ct);
-            var call = await db.CallLogs.FirstOrDefaultAsync(x => x.UniqueId == uniqueId, ct);
-            if (call == null)
-            {
-                // اگر به هر دلیل هنوز ساخته نشده، همین‌جا بساز
-                call = new CallLog { UniqueId = uniqueId, StartAt = DateTime.Now, Direction = "Inbound" };
-                db.CallLogs.Add(call);
-            }
+            var call = await GetOrCreateCallAsync(db, uniqueId, linkedId);
 
-            // اطلاعات عمومی صف
             if (d.TryGetValue("Queue", out var qname) && !string.IsNullOrWhiteSpace(qname))
                 call.QueueName = qname;
 
-            // تعیین داخلی پاسخگو از Interface/Channel/MemberName
             string? iface = d.TryGetValue("Interface", out var itf) ? itf : null;
             string? agentChan = d.TryGetValue("Channel", out var ch) ? ch : (d.TryGetValue("DestChannel", out var dch) ? dch : null);
             var maybeExt = ExtractExt(iface) ?? ExtractExt(agentChan);
@@ -299,12 +321,12 @@ namespace FaranegarCrmMvc.Services
                 case "QueueCallerLeave":
                     call.QueueLeaveAt = DateTime.Now;
                     if (d.TryGetValue("Reason", out var reason) && reason.Equals("timeout", StringComparison.OrdinalIgnoreCase))
-                        call.Disposition ??= "No Answer";
+                        call.Disposition = NormalizeDisposition("NO ANSWER");
                     break;
 
                 case "QueueCallerAbandon":
                     call.QueueLeaveAt = DateTime.Now;
-                    call.Disposition = "Abandoned";
+                    call.Disposition = NormalizeDisposition("ABANDONED");
                     break;
 
                 case "AgentCalled":
@@ -314,40 +336,24 @@ namespace FaranegarCrmMvc.Services
                 case "AgentConnect":
                     call.AgentConnectAt ??= DateTime.Now;
                     call.QueueHoldSec = d.TryGetValue("HoldTime", out var ht) ? ToInt(ht) : call.QueueHoldSec;
-                    call.AnsweredAt ??= DateTime.Now; // اگر BridgeEnter نیامده بود
-                    call.Disposition = "Answered";
+                    call.AnsweredAt ??= DateTime.Now;
+                    call.Disposition = NormalizeDisposition("ANSWERED");
                     break;
 
                 case "AgentComplete":
                     call.TalkSec = d.TryGetValue("TalkTime", out var tt) ? ToInt(tt) : call.TalkSec;
-                    // EndAt ممکن است بعداً با Hangup آپدیت شود؛ اگر نبود، همین‌جا حدس می‌زنیم
                     call.EndAt ??= DateTime.Now;
                     break;
             }
 
-            // در نهایت ذخیره
             await db.SaveChangesAsync(ct);
         }
 
-        // --- تماس‌های عمومی ---
-        private async Task UpsertCallAsync(string evt, string uniqueId, Dictionary<string, string> d, CancellationToken ct)
+        // ------------- Call Upsert -------------
+        private async Task UpsertCallAsync(string evt, string? uniqueId, string? linkedId, Dictionary<string, string> d, CancellationToken ct)
         {
             await using var db = await _dbFactory.CreateDbContextAsync(ct);
-            var call = await db.CallLogs.FirstOrDefaultAsync(x => x.UniqueId == uniqueId, ct);
-            if (call == null)
-            {
-                call = new CallLog
-                {
-                    UniqueId = uniqueId,
-                    StartAt = DateTime.Now,
-                    Direction = "Inbound"
-                };
-                db.CallLogs.Add(call);
-            }
-            else
-            {
-                call.Direction = "Inbound";
-            }
+            var call = await GetOrCreateCallAsync(db, uniqueId, linkedId);
 
             switch (evt)
             {
@@ -374,7 +380,7 @@ namespace FaranegarCrmMvc.Services
 
                 case "BridgeEnter":
                     call.AnsweredAt = DateTime.Now;
-                    call.Disposition = "Answered";
+                    call.Disposition = NormalizeDisposition("ANSWERED");
                     call.RawJson = JsonSerializer.Serialize(d);
                     break;
 
@@ -388,7 +394,7 @@ namespace FaranegarCrmMvc.Services
                     call.HangupCauseText = d.TryGetValue("Cause-txt", out var ct2) ? ct2 : call.HangupCauseText;
 
                     if (call.AnsweredAt == null)
-                        call.Disposition ??= "No Answer";
+                        call.Disposition = NormalizeDisposition(call.Disposition ?? "NO ANSWER");
 
                     if (call.EndAt != null)
                     {
@@ -413,7 +419,8 @@ namespace FaranegarCrmMvc.Services
                     call.BillSec = d.TryGetValue("Billsec", out var bs) ? ToInt(bs) :
                                        d.TryGetValue("BillableSeconds", out var bs2) ? ToInt(bs2) : call.BillSec;
 
-                    call.Disposition = d.TryGetValue("Disposition", out var disp) ? disp : call.Disposition;
+                    // CDR معمولاً UPPER است؛ ما یکدست می‌کنیم
+                    call.Disposition = NormalizeDisposition(d.TryGetValue("Disposition", out var disp) ? disp : call.Disposition);
                     call.RecordingFile = d.TryGetValue("RecordingFile", out var rf) ? rf : call.RecordingFile;
                     call.RawJson = JsonSerializer.Serialize(d);
                     break;
