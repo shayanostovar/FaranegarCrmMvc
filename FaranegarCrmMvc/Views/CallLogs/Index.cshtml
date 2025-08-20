@@ -1,0 +1,117 @@
+﻿@model IEnumerable<FaranegarCrmMvc.Models.CallLog>
+@{
+    ViewData["Title"] = "تماس‌ها";
+
+    int total = (int)(ViewBag.Total ?? 0);
+    int pg = (int)(ViewBag.Page ?? 1);
+    int ps = (int)(ViewBag.PageSize ?? 100);
+    int tp = (int)Math.Ceiling((double)total / Math.Max(1, ps));
+
+    string q = (string)(ViewBag.Q ?? "");
+    string? fromDate = (string?)ViewBag.From;
+    string? toDate = (string?)ViewBag.To;
+
+    var start = (pg - 1) * ps;
+    var i = 0;
+
+    string urlFirst = Url.Action("Index", "CallLogs", new { q = q, from = fromDate, to = toDate, page = 1, pageSize = ps })!;
+    string urlPrev = Url.Action("Index", "CallLogs", new { q = q, from = fromDate, to = toDate, page = pg - 1, pageSize = ps })!;
+    string urlNext = Url.Action("Index", "CallLogs", new { q = q, from = fromDate, to = toDate, page = pg + 1, pageSize = ps })!;
+    string urlLast = Url.Action("Index", "CallLogs", new { q = q, from = fromDate, to = toDate, page = tp, pageSize = ps })!;
+}
+
+<h2 class="px-3">@ViewData["Title"]</h2>
+
+<form method="get" class="row g-2 px-3 mb-3">
+    <div class="col-auto">
+        <input name="q" class="form-control" value="@q" placeholder="شماره/نام/مبدا/مقصد/داخلی/صف">
+    </div>
+    <div class="col-auto">
+        <input name="from" type="date" class="form-control" value="@fromDate">
+    </div>
+    <div class="col-auto">
+        <input name="to" type="date" class="form-control" value="@toDate">
+    </div>
+    <div class="col-auto">
+        <select name="pageSize" class="form-select" onchange="this.form.submit()">
+            <option value="50" selected="@(ps==50  ? "selected" : null)">50</option>
+            <option value="100" selected="@(ps==100 ? "selected" : null)">100</option>
+            <option value="200" selected="@(ps==200 ? "selected" : null)">200</option>
+            <option value="500" selected="@(ps==500 ? "selected" : null)">500</option>
+        </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-primary">اعمال</button></div>
+</form>
+
+<div class="mb-2 px-3">
+    <small>کل: <strong>@total</strong> | صفحه: <strong>@(pg)</strong> از <strong>@(tp)</strong></small>
+</div>
+
+<div class="table-responsive w-100 px-3">
+    <table class="table table-bordered table-striped table-sm align-middle w-100">
+        <thead>
+            <tr>
+                <th style="width:70px;">ردیف</th>
+                <th>شروع</th>
+                <th>پاسخ</th>
+                <th>پایان</th>
+                <th>وضعیت</th>
+                <th>CallerID</th>
+                <th>مبدا</th>
+                <th>مقصد</th>
+                <th>صف</th>
+                <th>Hold(s)</th>
+                <th>Agent Ext</th>
+                <th>Agent Chan</th>
+                <th>مدت</th>
+                <th>BillSec</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model)
+            {
+                <tr>
+                    <td>@(start + (++i))</td>
+                    <td class="nowrap">@r.StartAt.ToString("yyyy/MM/dd HH:mm:ss")</td>
+                    <td class="nowrap">@r.AnsweredAt?.ToString("HH:mm:ss")</td>
+                    <td class="nowrap">@r.EndAt?.ToString("HH:mm:ss")</td>
+                    <td>@r.Disposition</td>
+                    <td class="nowrap ltr">@r.CallerIdNum</td>
+                    <td class="nowrap ltr">@r.Src</td>
+                    <td class="nowrap ltr">@r.Dst</td>
+                    <td class="nowrap">@r.QueueName</td>
+                    <td class="nowrap">@r.QueueHoldSec</td>
+                    <td class="nowrap ltr">@r.AgentExt</td>
+                    <td class="nowrap">@r.AgentChannel</td>
+                    <td class="nowrap">@r.DurationSec</td>
+                    <td class="nowrap">@r.BillSec</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<nav aria-label="pager" class="px-3">
+    <ul class="pagination">
+        <li class="page-item @(pg<=1 ? "disabled" : "")"><a class="page-link" href="@urlFirst">اول</a></li>
+        <li class="page-item @(pg<=1 ? "disabled" : "")"><a class="page-link" href="@(pg>1 ? urlPrev : "#")">قبلی</a></li>
+        <li class="page-item @(pg>=tp ? "disabled" : "")"><a class="page-link" href="@(pg<tp ? urlNext : "#")">بعدی</a></li>
+        <li class="page-item @(pg>=tp ? "disabled" : "")"><a class="page-link" href="@urlLast">آخر</a></li>
+    </ul>
+</nav>
+
+<style>
+    .table th, .table td {
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .nowrap {
+        white-space: nowrap;
+    }
+
+    .ltr {
+        direction: ltr;
+        unicode-bidi: plaintext;
+    }
+</style>

@@ -4,6 +4,7 @@ using FaranegarCrmMvc.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FaranegarCrmMvc.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250819111242_SyncModel")]
+    partial class SyncModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -68,17 +71,6 @@ namespace FaranegarCrmMvc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AgentChannel")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTime?>("AgentConnectAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("AgentExt")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.Property<DateTime?>("AnsweredAt")
                         .HasColumnType("datetime2");
 
@@ -125,28 +117,12 @@ namespace FaranegarCrmMvc.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<int?>("QueueHoldSec")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("QueueJoinAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("QueueLeaveAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("QueueName")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
                     b.Property<string>("RawJson")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RecordingFile")
                         .HasMaxLength(260)
                         .HasColumnType("nvarchar(260)");
-
-                    b.Property<int?>("RingSec")
-                        .HasColumnType("int");
 
                     b.Property<string>("Src")
                         .HasMaxLength(64)
@@ -158,9 +134,6 @@ namespace FaranegarCrmMvc.Migrations
 
                     b.Property<DateTime>("StartAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int?>("TalkSec")
-                        .HasColumnType("int");
 
                     b.Property<string>("UniqueId")
                         .IsRequired()
@@ -175,77 +148,6 @@ namespace FaranegarCrmMvc.Migrations
                         .IsUnique();
 
                     b.ToTable("CallLogs");
-                });
-
-            modelBuilder.Entity("FaranegarCrmMvc.Models.QueueLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("AgentChannel")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("CallerIdNum")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int?>("Count")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Event")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int?>("HoldTime")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Interface")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("MemberName")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("Position")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Queue")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("RawJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<int?>("RingTime")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("TalkTime")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UniqueId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OccurredAt");
-
-                    b.HasIndex("UniqueId");
-
-                    b.ToTable("QueueLogs");
                 });
 
             modelBuilder.Entity("FaranegarCrmMvc.Models.SalesReport", b =>
